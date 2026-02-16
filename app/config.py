@@ -1,13 +1,20 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
     DB_HOST: str
     DB_PORT: int
     DB_NAME: str
     DB_USER: str
     DB_PASSWORD: str
+
+    REDIS_PORT: int             
+    REDIS_PASSWORD: str          
+    BASE_URL: str              
+    REDIS_HOST: str              
+    REDIS_USER_PASSWORD: str
+    REDIS_USER: str
+
     SECRET_KEY: str
     ALGORITHM: str
 
@@ -17,7 +24,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
 
 def get_db_url():
     return (f"postgresql+asyncpg://{settings.DB_USER}:{settings.DB_PASSWORD}@"

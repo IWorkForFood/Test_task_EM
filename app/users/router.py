@@ -10,15 +10,15 @@ from .models import User
 from .shemas import SRegisterUser, SAuthUser
 from sqlalchemy import text, insert
 from .dao import UserDAO
-from app.user_customization.dao import TypicalDataDAO
 from pydantic import EmailStr
+from app.exceptions import TokenExpiredException
 import uuid
 import datetime
 import os
 
 router_user = APIRouter(prefix='/users', tags=['Работа с пользовательскими данными'])
 
-async def create_typical_data_for_uset(id: int):
+async def create_typical_data_for_user(id: int):
     await TypicalDataDAO.add(user_id = id)
 
 @router_user.post('/registration')
@@ -32,14 +32,15 @@ async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
     await UserDAO.add(**user_dict)
     print(user_dict)
     current_user = await UserDAO.find_one_or_none(email=user_dict['email'])
-    background_tasks.add_task(create_typical_data_for_uset, current_user.id)
+    background_tasks.add_task(create_typical_data_for_user, current_user.id)
     return {"message": "Вы успешно зарегистрировались!"}
 
 @router_user.post('/login')
 async def auth_user(response: Response, uset_data: SAuthUser):
     user = await authenticate_user(**uset_data.dict())
     if not user:
-        raise Exception("Пизда!!!")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                  detail='Неверные учётные данные ')
     access_token = create_access_token({"sub": str(user.id)})
     response.set_cookie(key="users_access_token", value=access_token, httponly=True)
     return {"ok": True, "access_token": access_token, 'refresh_token': None, 'message': 'Авторизация успешна!'}
@@ -48,6 +49,7 @@ async def auth_user(response: Response, uset_data: SAuthUser):
 async def logout_user(response: Response):
     response.delete_cookie(key="users_access_token")
     return {"message": "Вы успешно вышли из системы"}
+
 
 @router_user.get("/me")
 async def get_my_data(user_data: User = Depends(get_current_user)):

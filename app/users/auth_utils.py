@@ -23,7 +23,6 @@ def create_access_token(data) -> str:
 
 async def authenticate_user(email: EmailStr, password: str):
     user = await UserDAO.find_one_or_none(email=email)
-    print(f"/n/n//n/n/n//n/n {user.password} /n {get_password_hash(password)} /n {verify_password(user.password, get_password_hash(password))}   /nn/n//n/n/n//n/n/n//n//n/n/n/n/n/n/n/nn//n/n/n//n/n/n/n/n/ ")
     if user and verify_password(plain_password=password, hashed_password=user.password):
         return user
     return None

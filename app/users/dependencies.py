@@ -1,9 +1,10 @@
-from app.exceptions import TokenNotFound, NoUserIdException, NoJwtException
-from fastapi import Request, Depends
+from app.exceptions import TokenNotFound, NoUserIdException, NoJwtException, TokenExpiredException
+from fastapi import Request, Depends, HTTPException, status
 from .auth_utils import get_auth_data
 from .dao import UserDAO 
 from jose import jwt, JWTError
 from datetime import datetime, timezone
+from enum import Enum
 
 def get_token(request: Request):
     token = request.cookies.get("users_access_token")
@@ -35,4 +36,6 @@ async def get_current_user(token: str = Depends(get_token)):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='User not found')
     return user
+
+
 

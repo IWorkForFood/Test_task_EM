@@ -7,14 +7,18 @@ from pydantic import field_validator, ValidationError, ConfigDict
 
 class User(Base):
     id: Mapped[int_pk]
-    username: Mapped[str]
+    first_name: Mapped[str]
+    last_name: Mapped[str]
     password: Mapped[str_uniq]
     email: Mapped[str_uniq]
-    is_admin: Mapped[bool] = mapped_column(default=True, server_default=text('true'), nullable=False)
+    is_user: Mapped[bool] = mapped_column(default=True, server_default=text('true'), nullable=False)
+    is_seller: Mapped[bool] = mapped_column(default=False, server_default=text('false'), nullable=False)
+    is_moderator: Mapped[bool] = mapped_column(default=False, server_default=text('false'), nullable=False)
+    is_admin: Mapped[bool] = mapped_column(default=False, server_default=text('false'), nullable=False)
 
-    textreports: Mapped[list['TextReport']] = relationship("TextReport", back_populates="user")
+    reviews: Mapped[list['Reviews']] = relationship("Reviews", back_populates="user")
 
-    typical_data: Mapped[list["TypicalData"]] = relationship("TypicalData", back_populates="user")
+    #typical_data: Mapped[list["TypicalData"]] = relationship("TypicalData", back_populates="user")
 
     extend_existing=True
 

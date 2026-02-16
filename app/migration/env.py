@@ -14,9 +14,11 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(abspath(__file__))))
 
 from app.database import DATABASE_URL, Base
+from app.order.models import Order
+from app.permissions.models import Role, BusinessElement, AccessRuleEnum
+from app.products.models import Product
+from app.reviews.models import Review
 from app.users.models import User
-from app.students.models import TextReport
-from app.user_customization.models import TypicalData
 
 
 # this is the Alembic Config object, which provides

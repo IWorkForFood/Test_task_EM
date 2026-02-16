@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from typing import Optional
 import re
-from pydantic import BaseModel, Field, EmailStr, validator, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, EmailStr, validator, ConfigDict, field_validator
 
 
 class SAuthUser(BaseModel):
@@ -23,13 +23,13 @@ class SAuthUser(BaseModel):
         return value
 
 class SRegisterUser(SAuthUser):
-    password_replay: str = Field(..., min_length=6, max_length=30)
     username: str = Field(..., min_length=1, max_length=30)
 
-    @model_validator(mode="after")
-    def check_passwords_match(self) -> "SRegisterUser":
-        if self.password != self.password_replay:
-            raise ValueError("Пароли не совпадают")
-        return self
+
+
+    
+    
+        
+
 
 

@@ -8,3 +8,9 @@ NoJwtException = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
 
 NoUserIdException = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                   detail='Не найден ID пользователя')
+
+TokenExpiredException = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                       detail='Токен истёк')
+
+NotExcistingCredentials = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                  detail='Неверные учётные данные ')
