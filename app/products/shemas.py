@@ -4,8 +4,8 @@ import re
 from pydantic import BaseModel, Field, EmailStr, validator, ConfigDict
 from .dependencies import WorkType
 
-class STextReport(BaseModel):
-    id: int = Field(description="id отзыва")
+class SProduct(BaseModel):
+    id: int = Field(description="id объявления")
     stars_amount: int = Field(default=3, description="Кол-во звезд (оценка товара)")
     review_content: str = Field(description="Содержание отзыва")
     username: str = Field(description="Имя пользователя, оставившего отзыв")

@@ -12,7 +12,7 @@ class Order(Base):
     description: Mapped[str]
     buyer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
-    product: Mapped["Products"] = relationship("Products", back_populates="orders")
+    product: Mapped["Product"] = relationship("Product", back_populates="order")
 
     buyer: Mapped["User"] = relationship("User", back_populates="orders")
 

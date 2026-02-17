@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from .auth_utils import get_auth_data, get_password_hash, authenticate_user, create_access_token
 from .dependencies import get_current_user
 from .models import User
-from .shemas import SRegisterUser, SAuthUser
+from .shemas import SRegisterUser, SAuthUser, SEditUserData
 from sqlalchemy import text, insert
 from .dao import UserDAO
 from pydantic import EmailStr
@@ -28,6 +28,7 @@ async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
         raise HTTPException(status_code = status.HTTP_409_CONFLICT, 
         detail='Пользователь c такой почтой уже существует')
     user_dict = user_data.dict()
+    del user_dict['password_replay']
     user_dict.update({'password': get_password_hash(user_data.password)})
     await UserDAO.add(**user_dict)
     print(user_dict)
@@ -38,7 +39,7 @@ async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
 @router_user.post('/login')
 async def auth_user(response: Response, uset_data: SAuthUser):
     user = await authenticate_user(**uset_data.dict())
-    if not user:
+    if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                   detail='Неверные учётные данные ')
     access_token = create_access_token({"sub": str(user.id)})
@@ -55,4 +56,14 @@ async def logout_user(response: Response):
 async def get_my_data(user_data: User = Depends(get_current_user)):
     return user_data
 
-    
+@router_user.patch("/update")
+async def update_my_data(data_for_update: SEditUserData, user_data: User = Depends(get_current_user)):
+    dict_data_for_update = data_for_update.model_dump(exclude_unset=True)
+    result = await UserDAO.update(filter_by={"id": user_data.id}, **dict_data_for_update)
+    return {"message": "Данные успешно обновлены"}
+
+@router_user.delete("/delete_account")
+async def delete_account(response: Response, user_data: User = Depends(get_current_user)):
+    response.delete_cookie(key="users_access_token")
+    result = await UserDAO.update(filter_by={"id": user_data.id}, is_active = False)
+    return {"message": "Аккаунт был удален"}

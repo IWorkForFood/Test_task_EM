@@ -15,10 +15,13 @@ class User(Base):
     is_seller: Mapped[bool] = mapped_column(default=False, server_default=text('false'), nullable=False)
     is_moderator: Mapped[bool] = mapped_column(default=False, server_default=text('false'), nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False, server_default=text('false'), nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, server_default=text('false'), nullable=False)
 
-    reviews: Mapped[list['Reviews']] = relationship("Reviews", back_populates="user")
+    reviews: Mapped[list['Review']] = relationship("Review", back_populates="user")
 
-    #typical_data: Mapped[list["TypicalData"]] = relationship("TypicalData", back_populates="user")
+    products: Mapped[list["Product"]] = relationship("Product", back_populates="seller")
+
+    orders: Mapped[list["Order"]] = relationship("Order", back_populates="buyer")
 
     extend_existing=True
 
