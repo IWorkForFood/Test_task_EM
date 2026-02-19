@@ -1,163 +1,139 @@
-from sqlalchemy import select 
-from app.database import async_session_maker 
-from fastapi import FastAPI, File, UploadFile, HTTPException, APIRouter, Depends
-from fastapi.responses import FileResponse
-from .models import TextReport
-from .shemas import STextReport, STextReportUpdate
-from sqlalchemy import text, insert
-from .dao import TextReportsDAO
-from app.tasks import test_task
-import datetime
-import os
-import time
-from .dao import TextReportsDAO
-from app.users.dependencies import get_current_user
-from app.user_customization.dao import TypicalDataDAO
-from app.users.models import User
-from .utils import ReportCreator2000
-import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional
 
-router_textreports = APIRouter(prefix='/textroports', tags=['Работа с отчетами'])
+from .shemas import SOrder, SOrderCreate, SOrderUpdate
+from .dao import OrderDAO
+from ..products.dao import ProductDAO
+from ..users.dependencies import get_current_user, permission_required, get_user_permissions_for_resource
+from ..users.models import User
 
-@router_textreports.post("/task")
-async def task(filename: str, md_file: UploadFile, user_data: User = Depends(get_current_user)):
+router_orders = APIRouter(
+    prefix="/orders",
+    tags=["orders"]
+)
 
-    dir_path = "./process_files"
+@router_orders.get("", response_model=List[SOrder])
+async def get_orders(
+    limit: int = Query(20, ge=1, le=100, description="Количество на странице"),
+    offset: int = Query(0, ge=0, description="Смещение"),
+    user: User = Depends(permission_required("Order", ["read", "read_all"])),
+):
+    perms = await get_user_permissions_for_resource(user, "Order")
+    can_read_all = perms.get("read_all", False)
 
-    md_file_name = md_file.filename
+    if can_read_all:
+        # Видим все заказы
+        orders = await OrderDAO.find_all()
+    else:
+        # Только свои заказы
+        orders = await OrderDAO.find_filtered(buyer_id=user.id)
 
-    absolute_path = os.path.abspath(dir_path)
+    # Ручная пагинация (пока DAO не поддерживает offset/limit)
+    start = offset
+    end = offset + limit
+    paginated = orders[start:end]
 
-    uniqe_md_path = f"{user_data.id}"
-    unique_dirname = f"{uniqe_md_path}/{datetime.datetime.now()}/{uuid.uuid4()}"
-    absolute_uniqe_dirname = os.path.join(absolute_path, unique_dirname)
-    absolute_uniqe_md_path = os.path.join(absolute_path, uniqe_md_path)
-    md_path_with_filename = f"{uniqe_md_path}/{md_file_name}"
-    abs_md_path_with_filename = os.path.join(absolute_path, md_path_with_filename)
+    if not paginated:
+        raise HTTPException(status_code=404, detail="Заказов не найдено")
 
-    #path_exists = True
-    #while path_exists:
-    #    try:
-    #        os.makedirs(path)
-    #        break
-    #    except Exception:
-    #        continue
-    os.makedirs(absolute_uniqe_dirname)
+    return paginated
 
-    
-    with open(abs_md_path_with_filename, 'wb') as file:
-        file.write(md_file.file.read())
+@router_orders.get("/{order_id}", response_model=SOrder)
+async def get_order(
+    order_id: int,
+    user: User = Depends(permission_required("Order", ["read", "read_all"])),
+):
+    order = await OrderDAO.find_one_or_none(id=order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
 
-    rep = ReportCreator2000(output_dir = absolute_path)
-    typical_data = await TypicalDataDAO.find_one_or_none(user_id = user_data.id)
-    
+    perms = await get_user_permissions_for_resource(user, "Order")
+    can_read_all = perms.get("read_all", False)
 
-    title_vars = {
-        "name": f'{typical_data.author_lastname} {typical_data.author_firstname[0].upper()}. {typical_data.author_surname[0].upper()}.',
-        "group_number": typical_data.group_number,
-        "student_id": typical_data.record_book_number,
-        "supervisor": f'{typical_data.instructor_lastname} {typical_data.instructor_firstname[0].upper()}. {typical_data.instructor_surname[0].upper()}.',
-        "work_title": typical_data.work_title,
-        "completion_year": typical_data.completion_year,
-        "department": typical_data.department,
-        "institute": typical_data.institute
-    }
+    if not can_read_all and order.buyer_id != user.id:
+        raise HTTPException(403, "Можно просматривать только свои заказы")
 
+    return order
 
-    result = rep.create_new_report(
-        content_md_path = f"{uniqe_md_path}/{md_file_name}",
-        content_docx_path="content.docx",
-        reference_style_docx="custom-reference2.docx",
-        title_template_path="Titul.docx",
-        filled_title_path="new_titul.docx",
-        final_report_path=f"{unique_dirname}/{filename}.docx",
-        **title_vars
+@router_orders.post("", response_model=SOrder, status_code=201)
+async def create_order(
+    data: SOrderCreate,
+    user: User = Depends(permission_required("Order", ["create"])),
+):
+    # Проверяем существование товара
+    product = await ProductDAO.find_one_or_none(id=data.product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+
+    # Создаём заказ
+    new_order = await OrderDAO.add(
+        name=data.name,
+        cost=data.cost,
+        description=data.description,
+        buyer_id=user.id,
+        product_id=data.product_id,
     )
 
-    await TextReportsDAO.add(filename=os.path.basename(result), path=result, user_id = user_data.id)
-    
-    return FileResponse(path=f"{result}", filename=f"{os.path.basename(result)}", media_type="application/octet-stream")
+    return new_order
 
+@router_orders.patch("/{order_id}", response_model=SOrder)
+async def update_order(
+    order_id: int,
+    data: SOrderUpdate,
+    user: User = Depends(permission_required("Order", ["update", "update_all"])),
+):
+    order = await OrderDAO.find_one_or_none(id=order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
 
+    perms = await get_user_permissions_for_resource(user, "Order")
+    can_update_all = perms.get("update_all", False)
+    can_update_own = perms.get("update", False)
 
-@router_textreports.post("/new_textreport", response_model=STextReport)
-async def upload_files(upload_file: UploadFile, filename: str):
-
-    unique_dirname = f"{datetime.datetime.now()}/{uuid.uuid4()}"
-    
-    directory = f"./textreport/{unique_dirname}"  
-    os.makedirs(directory, exist_ok = True)
-
-    file = upload_file.file
-    suffix = upload_file.filename.split('.')[-1]
-    filename = '.'.join([filename, suffix])
-    directory_with_file = os.path.join(directory, filename)
-
-    with open(directory_with_file, "wb") as f:
-        f.write(file.read())
-
-    new_textreport = await TextReportsDAO.add(filename=filename, path=directory_with_file)
-
-    response = {'filename': filename, 'path': directory_with_file}
-
-    return response
-
-@router_textreports.post("/find_all_textreports")
-async def find_all_textreports_data() -> list[STextReport]:
-    return await TextReportsDAO.find_all()
-
-@router_textreports.get("/find_one_or_none", summary="Получить один отчет по фильтру")
-async def find_one_or_none(file_id: int) -> STextReport:
-    textreport = await TextReportsDAO.find_one_or_none(id = file_id)
-    if not textreport:
-        raise HTTPException(status_code=404, detail="Отчет не найден")
-    return textreport
-
-@router_textreports.get("/download")
-async def download_file(file_id: int):
-    textreport = await TextReportsDAO.find_one_or_none(id = file_id)
-    absolute_path = os.path.abspath(textreport.path)
-    return FileResponse(path=f"{absolute_path}", filename=f"{os.path.basename(absolute_path)}", media_type="application/octet-stream")
-
-
-@router_textreports.patch("/patch_textreport/{file_id}")
-async def update_textreport(file_id: int, update: STextReportUpdate = Depends(), upload_file: UploadFile = None):
-
-    update_dict = update.model_dump(exclude_unset=True)
-    textreport = await TextReportsDAO.find_one_or_none(id = file_id)
-    path_with_file = textreport.path
-    original_path = os.path.dirname(path_with_file)
-
-    os.remove(path_with_file)
-    suffix = upload_file.filename.split('.')[-1]
-    filename = '.'.join([update.filename, suffix])
-    new_textreport_path = os.path.join(original_path, filename)
-    absolute_path = os.path.abspath(new_textreport_path)
-    file = upload_file.file
-
-    with open(new_textreport_path, "wb") as f:
-        f.write(file.read())
-
-    update_dict['path'] = new_textreport_path
-
-    if not update_dict:
-        raise HTTPException(400, "No valid fields to update")
-
-    result = await TextReportsDAO.update({'id': file_id}, **update_dict)
-    return update
-
-@router_textreports.delete("/delete_textreport/{file_id}")
-async def update_textreport(file_id: int):
-
-    check = await TextReportsDAO.delete_student_by_id(file_id)
-    if check:
-        return {"message": "Файл был успешно удален."}
+    if can_update_all:
+        pass  # полный доступ
+    elif can_update_own:
+        if order.buyer_id != user.id:
+            raise HTTPException(403, "Можно редактировать только свои заказы")
     else:
-        return {"message": "Не удалось удалить файл."}
+        raise HTTPException(403, "Нет права на редактирование заказов")
 
+    values = data.model_dump(exclude_unset=True)
+    if values:
+        updated_count = await OrderDAO.update(
+            filter_by={"id": order_id},
+            **values
+        )
+        if updated_count == 0:
+            raise HTTPException(500, "Не удалось обновить заказ")
 
+    updated_order = await OrderDAO.find_one_or_none(id=order_id)
+    return updated_order
 
+@router_orders.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_order(
+    order_id: int,
+    user: User = Depends(permission_required("Order", ["delete", "delete_all"])),
+):
+    order = await OrderDAO.find_one_or_none(id=order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
 
+    perms = await get_user_permissions_for_resource(user, "Order")
+    can_delete_all = perms.get("delete_all", False)
+    can_delete_own = perms.get("delete", False)
 
+    if can_delete_all:
+        pass  # может удалить любой заказ
+    elif can_delete_own:
+        if order.buyer_id != user.id:
+            raise HTTPException(403, "Можно удалять только свои заказы")
+    else:
+        raise HTTPException(403, "Нет права на удаление заказов")
 
+    # Удаляем (используем метод delete_by_id из твоего DAO)
+    deleted = await OrderDAO.delete_by_id(order_id)
+    if not deleted:
+        raise HTTPException(status_code=500, detail="Не удалось удалить заказ")
 
+    return None

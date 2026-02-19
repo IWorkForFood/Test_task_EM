@@ -1,9 +1,16 @@
-from sqlalchemy import ForeignKey, text, Text
+from sqlalchemy import ForeignKey, text, Text, Table, Column
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base, str_uniq, int_pk, str_null_true, int_null_true
 from datetime import date
 from enum import Enum
 from pydantic import field_validator, ValidationError, ConfigDict
+
+user_roles = Table(
+    'user_roles',
+    Base.metadata,
+    Column('user_id', ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
+    Column('role_id', ForeignKey('roles.id', ondelete='CASCADE'), primary_key=True)
+)
 
 class User(Base):
     id: Mapped[int_pk]
@@ -22,6 +29,8 @@ class User(Base):
     products: Mapped[list["Product"]] = relationship("Product", back_populates="seller")
 
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="buyer")
+
+    roles: Mapped[list["Role"]] = relationship("Role", secondary=user_roles, back_populates="users")
 
     extend_existing=True
 

@@ -1,163 +1,121 @@
 from sqlalchemy import select 
 from app.database import async_session_maker 
-from fastapi import FastAPI, File, UploadFile, HTTPException, APIRouter, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, APIRouter, Depends, status
 from fastapi.responses import FileResponse
-from .models import TextReport
-from .shemas import STextReport, STextReportUpdate
 from sqlalchemy import text, insert
-from .dao import TextReportsDAO
+from .dao import ReviewDAO
 from app.tasks import test_task
+from .shemas import SReadReview, SUpdateReview, SCreateReview
 import datetime
 import os
 import time
-from .dao import TextReportsDAO
-from app.users.dependencies import get_current_user
-from app.user_customization.dao import TypicalDataDAO
+from app.users.dependencies import get_current_user, permission_required, get_user_permissions_for_resource
 from app.users.models import User
-from .utils import ReportCreator2000
-import uuid
+from typing import List
+from ..products.dao import ProductDAO
 
-router_textreports = APIRouter(prefix='/textroports', tags=['Работа с отчетами'])
-
-@router_textreports.post("/task")
-async def task(filename: str, md_file: UploadFile, user_data: User = Depends(get_current_user)):
-
-    dir_path = "./process_files"
-
-    md_file_name = md_file.filename
-
-    absolute_path = os.path.abspath(dir_path)
-
-    uniqe_md_path = f"{user_data.id}"
-    unique_dirname = f"{uniqe_md_path}/{datetime.datetime.now()}/{uuid.uuid4()}"
-    absolute_uniqe_dirname = os.path.join(absolute_path, unique_dirname)
-    absolute_uniqe_md_path = os.path.join(absolute_path, uniqe_md_path)
-    md_path_with_filename = f"{uniqe_md_path}/{md_file_name}"
-    abs_md_path_with_filename = os.path.join(absolute_path, md_path_with_filename)
-
-    #path_exists = True
-    #while path_exists:
-    #    try:
-    #        os.makedirs(path)
-    #        break
-    #    except Exception:
-    #        continue
-    os.makedirs(absolute_uniqe_dirname)
-
-    
-    with open(abs_md_path_with_filename, 'wb') as file:
-        file.write(md_file.file.read())
-
-    rep = ReportCreator2000(output_dir = absolute_path)
-    typical_data = await TypicalDataDAO.find_one_or_none(user_id = user_data.id)
-    
-
-    title_vars = {
-        "name": f'{typical_data.author_lastname} {typical_data.author_firstname[0].upper()}. {typical_data.author_surname[0].upper()}.',
-        "group_number": typical_data.group_number,
-        "student_id": typical_data.record_book_number,
-        "supervisor": f'{typical_data.instructor_lastname} {typical_data.instructor_firstname[0].upper()}. {typical_data.instructor_surname[0].upper()}.',
-        "work_title": typical_data.work_title,
-        "completion_year": typical_data.completion_year,
-        "department": typical_data.department,
-        "institute": typical_data.institute
-    }
+router_reviews = APIRouter(prefix='/reviews', tags=['Работа с отзывами'])
 
 
-    result = rep.create_new_report(
-        content_md_path = f"{uniqe_md_path}/{md_file_name}",
-        content_docx_path="content.docx",
-        reference_style_docx="custom-reference2.docx",
-        title_template_path="Titul.docx",
-        filled_title_path="new_titul.docx",
-        final_report_path=f"{unique_dirname}/{filename}.docx",
-        **title_vars
+
+@router_reviews.get("/get_product_reviews", response_model=List[SReadReview])
+async def get_products(
+    product_id: int,
+    offset: int, 
+    limit: int
+):
+    all_reviews = await ReviewDAO.find_filtered(product_id=product_id)
+
+    if not all_reviews:
+        raise HTTPException(status_code=404, detail="Отзывов на товар нет")
+
+
+    start = offset
+    end = offset + limit
+    return all_reviews[start:end]
+
+@router_reviews.post("", response_model=SReadReview, status_code=201)
+async def create_product(
+    review_data: SCreateReview,
+    user: User = Depends(permission_required("Review", ["create"])), 
+):
+    existing = await ProductDAO.find_one_or_none(id=review_data.product_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Данного товара нет")
+
+    is_review = await ReviewDAO.find_one_or_none(product_id=review_data.product_id)
+    if is_review:
+        raise HTTPException(status_code=409, detail="Отзыв на этот товар от вас уже существует")
+
+    dict_review_data = review_data.dict()
+    new_review = await ReviewDAO.add(
+        **dict_review_data, user_id = user.id
     )
 
-    await TextReportsDAO.add(filename=os.path.basename(result), path=result, user_id = user_data.id)
-    
-    return FileResponse(path=f"{result}", filename=f"{os.path.basename(result)}", media_type="application/octet-stream")
+    return new_review
 
+@router_reviews.patch("/{product_id}", response_model=SReadReview)
+async def update_product(
+    data: SUpdateReview,
+    user: User = Depends(permission_required("Review", ["update", "update_all"])
+)):
+    review_id = data.id
+    review = await ReviewDAO.find_one_or_none(id=review_id)
+    if not review:
+        raise HTTPException(404, "Комментарий не найден")
 
+    perms = await get_user_permissions_for_resource(user, "Review")
 
-@router_textreports.post("/new_textreport", response_model=STextReport)
-async def upload_files(upload_file: UploadFile, filename: str):
+    can_update_all = perms.get("update_all", False)
+    can_update_own  = perms.get("update", False)
 
-    unique_dirname = f"{datetime.datetime.now()}/{uuid.uuid4()}"
-    
-    directory = f"./textreport/{unique_dirname}"  
-    os.makedirs(directory, exist_ok = True)
+    if can_update_all:
+        pass 
 
-    file = upload_file.file
-    suffix = upload_file.filename.split('.')[-1]
-    filename = '.'.join([filename, suffix])
-    directory_with_file = os.path.join(directory, filename)
-
-    with open(directory_with_file, "wb") as f:
-        f.write(file.read())
-
-    new_textreport = await TextReportsDAO.add(filename=filename, path=directory_with_file)
-
-    response = {'filename': filename, 'path': directory_with_file}
-
-    return response
-
-@router_textreports.post("/find_all_textreports")
-async def find_all_textreports_data() -> list[STextReport]:
-    return await TextReportsDAO.find_all()
-
-@router_textreports.get("/find_one_or_none", summary="Получить один отчет по фильтру")
-async def find_one_or_none(file_id: int) -> STextReport:
-    textreport = await TextReportsDAO.find_one_or_none(id = file_id)
-    if not textreport:
-        raise HTTPException(status_code=404, detail="Отчет не найден")
-    return textreport
-
-@router_textreports.get("/download")
-async def download_file(file_id: int):
-    textreport = await TextReportsDAO.find_one_or_none(id = file_id)
-    absolute_path = os.path.abspath(textreport.path)
-    return FileResponse(path=f"{absolute_path}", filename=f"{os.path.basename(absolute_path)}", media_type="application/octet-stream")
-
-
-@router_textreports.patch("/patch_textreport/{file_id}")
-async def update_textreport(file_id: int, update: STextReportUpdate = Depends(), upload_file: UploadFile = None):
-
-    update_dict = update.model_dump(exclude_unset=True)
-    textreport = await TextReportsDAO.find_one_or_none(id = file_id)
-    path_with_file = textreport.path
-    original_path = os.path.dirname(path_with_file)
-
-    os.remove(path_with_file)
-    suffix = upload_file.filename.split('.')[-1]
-    filename = '.'.join([update.filename, suffix])
-    new_textreport_path = os.path.join(original_path, filename)
-    absolute_path = os.path.abspath(new_textreport_path)
-    file = upload_file.file
-
-    with open(new_textreport_path, "wb") as f:
-        f.write(file.read())
-
-    update_dict['path'] = new_textreport_path
-
-    if not update_dict:
-        raise HTTPException(400, "No valid fields to update")
-
-    result = await TextReportsDAO.update({'id': file_id}, **update_dict)
-    return update
-
-@router_textreports.delete("/delete_textreport/{file_id}")
-async def update_textreport(file_id: int):
-
-    check = await TextReportsDAO.delete_student_by_id(file_id)
-    if check:
-        return {"message": "Файл был успешно удален."}
+    elif can_update_own:
+        if review.user_id != user.id:
+            raise HTTPException(403, "Можно редактировать только свои комментарии")
     else:
-        return {"message": "Не удалось удалить файл."}
+        raise HTTPException(403, "Нет права на редактирование комментария")
+
+    values = data.model_dump(exclude_unset=True)
 
 
+    if values:
+        updated_count = await ReviewDAO.update(
+            filter_by={"id": review_id},
+            **values
+        )
+        if updated_count == 0:
+            raise HTTPException(500, "Не удалось обновить товар")
 
+    # Возвращаем актуальное состояние
+    updated_review = await ReviewDAO.find_one_or_none(id=review_id)
+    return updated_review
 
+@router_reviews.delete("/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_review(
+    review_id: int,
+    user: User = Depends(permission_required("Review", ["delete", "delete_all"])),
+):
+    review = await ReviewDAO.find_one_or_none(id=review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="Отзыв не найден")
 
+    perms = await get_user_permissions_for_resource(user, "Review")
+    can_delete_all = perms.get("delete_all", False)
+    can_delete_own  = perms.get("delete", False)
 
+    if can_delete_all:
+        pass
+    elif can_delete_own:
+        if review.user_id != user.id:
+            raise HTTPException(403, "Можно удалять только свои отзывы")
+    else:
+        raise HTTPException(403, "Нет права на удаление отзывов")
 
+    deleted = await ReviewDAO.delete_by_id(review_id)
+    if not deleted:
+        raise HTTPException(500, "Не удалось удалить отзыв")
+
+    return None

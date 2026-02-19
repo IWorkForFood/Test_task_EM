@@ -11,6 +11,13 @@ class BaseDAO:
             query = select(cls.model)
             result = await session.execute(query)
             return result.scalars().all()
+
+    @classmethod
+    async def find_filtered(cls, **filters):
+        async with async_session_maker() as session:
+            query = select(cls.model).filter_by(**filters)
+            result = await session.execute(query)
+            return result.scalars().all()
     
     @classmethod
     async def find_one_or_none(cls, **filter_by):
@@ -51,7 +58,7 @@ class BaseDAO:
                 return result.rowcount
     
     @classmethod
-    async def delete_student_by_id(cls, student_id: int):
+    async def delete_by_id(cls, student_id: int):
         async with async_session_maker() as session:
             async with session.begin():
                 query = select(cls.model).filter_by(id=student_id)

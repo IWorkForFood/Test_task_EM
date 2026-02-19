@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, Response, HTTPException, status, Backgro
 from sqlalchemy import select 
 from app.database import async_session_maker 
 from app.users.models import User
+from app.permissions.models import Role
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse
 from .auth_utils import get_auth_data, get_password_hash, authenticate_user, create_access_token
 from .dependencies import get_current_user
-from .models import User
+from .models import User, user_roles
 from .shemas import SRegisterUser, SAuthUser, SEditUserData
 from sqlalchemy import text, insert
 from .dao import UserDAO
@@ -18,8 +19,6 @@ import os
 
 router_user = APIRouter(prefix='/users', tags=['Работа с пользовательскими данными'])
 
-async def create_typical_data_for_user(id: int):
-    await TypicalDataDAO.add(user_id = id)
 
 @router_user.post('/registration')
 async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
@@ -29,11 +28,32 @@ async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
         detail='Пользователь c такой почтой уже существует')
     user_dict = user_data.dict()
     del user_dict['password_replay']
+    del user_dict['role_ids']
     user_dict.update({'password': get_password_hash(user_data.password)})
     await UserDAO.add(**user_dict)
-    print(user_dict)
     current_user = await UserDAO.find_one_or_none(email=user_dict['email'])
-    background_tasks.add_task(create_typical_data_for_user, current_user.id)
+
+    async with async_session_maker() as session:
+
+        if user_data.role_ids:
+            # Проверяем, что роли существуют
+            roles = await session.execute(
+                select(Role).where(Role.id.in_(user_data.role_ids))
+            )
+            existing_roles = roles.scalars().all()
+            
+            if len(existing_roles) != len(user_data.role_ids):
+                raise HTTPException(400, "Одна или несколько ролей не найдены")
+
+            # Добавляем связи
+            for role_id in user_data.role_ids:
+                # Можно добавить через insert в user_roles
+                await session.execute(
+                    user_roles.insert().values(user_id=current_user.id, role_id=role_id)
+                )
+
+        await session.commit()
+
     return {"message": "Вы успешно зарегистрировались!"}
 
 @router_user.post('/login')

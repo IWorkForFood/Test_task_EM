@@ -4,71 +4,40 @@ import re
 from pydantic import BaseModel, Field, EmailStr, validator, ConfigDict, field_validator
 
 
-# ───────────────────────────────────────────────
-# Pydantic-схемы (для валидации и OpenAPI)
-# ───────────────────────────────────────────────
-
-class AccessRuleBase(BaseModel):
-    """Общие поля, используемые в create / update / response"""
-    role_id: int = Field(..., ge=1, description="ID роли")
-    element_id: int = Field(..., ge=1, description="ID бизнес-объекта / ресурса")
-
-    # Все возможные разрешения — типизированы через Enum
-    read: PermissionLevel = Field(default=PermissionLevel.DENY)
-    read_all: PermissionLevel = Field(default=PermissionLevel.DENY)
-    create: PermissionLevel = Field(default=PermissionLevel.DENY)
-    update: PermissionLevel = Field(default=PermissionLevel.DENY)
-    update_all: PermissionLevel = Field(default=PermissionLevel.DENY)
-    delete: PermissionLevel = Field(default=PermissionLevel.DENY)
-    delete_all: PermissionLevel = Field(default=PermissionLevel.DENY)
-
-    model_config = ConfigDict(
-        from_attributes=True,          # позволяет работать с ORM-объектами
-        json_schema_extra={
-            "example": {
-                "role_id": 2,
-                "element_id": 3,
-                "read": "allow",
-                "read_all": "deny",
-                "create": "allow",
-                "update": "allow",
-                "update_all": "deny",
-                "delete": "allow",
-                "delete_all": "deny"
-            }
-        }
-    )
-
-
-class AccessRuleCreate(AccessRuleBase):
-    """Схема для создания новой записи"""
-    pass
-
-
 class AccessRuleUpdate(BaseModel):
-    """Схема для частичного обновления — все поля опциональны"""
-    role_id: Optional[int] = None
-    element_id: Optional[int] = None
+    """Схема для обновления одного правила доступа"""
+    role_id: int = Field(..., gt=0)
+    element_id: int = Field(..., gt=0)
 
-    read: Optional[PermissionLevel] = None
-    read_all: Optional[PermissionLevel] = None
-    create: Optional[PermissionLevel] = None
-    update: Optional[PermissionLevel] = None
-    update_all: Optional[PermissionLevel] = None
-    delete: Optional[PermissionLevel] = None
-    delete_all: Optional[PermissionLevel] = None
+    read: Optional[bool] = None
+    read_all: Optional[bool] = None
+    create: Optional[bool] = None
+    update: Optional[bool] = None
+    update_all: Optional[bool] = None
+    delete: Optional[bool] = None
+    delete_all: Optional[bool] = None
 
+    class Config:
+        from_attributes = True
 
-class AccessRuleOut(AccessRuleBase):
-    """Схема для ответа (с id и временными метками)"""
-    id: int | uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
+class AccessRuleUpdateResponse(AccessRuleUpdate):
+    id: int
+    role_id: int
+    element_id: int
 
 
+class Role(BaseModel):
+    """Для получения ролей пользователей в системе (admin, seller, buyer, moderator и т.д.)"""
+
+    id: int
+    name: str
+    description: Optional[str] = None
+
+class BusinessElement(BaseModel):
+    """Для получения бизнес-объектов / ресурсов приложений, к которым применяются правила доступа"""
+    id: int
+    name: str
+    description: str
 
 
     

@@ -11,6 +11,7 @@ class Order(Base):
     cost: Mapped[float]
     description: Mapped[str]
     buyer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
 
     product: Mapped["Product"] = relationship("Product", back_populates="order")
 

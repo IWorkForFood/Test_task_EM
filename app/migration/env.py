@@ -15,7 +15,7 @@ sys.path.insert(0, dirname(dirname(abspath(__file__))))
 
 from app.database import DATABASE_URL, Base
 from app.order.models import Order
-from app.permissions.models import Role, BusinessElement, AccessRuleEnum
+from app.permissions.models import Role, BusinessElement, AccessRule
 from app.products.models import Product
 from app.reviews.models import Review
 from app.users.models import User

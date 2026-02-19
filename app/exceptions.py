@@ -1,6 +1,6 @@
 from fastapi import status, HTTPException
 
-TokenNotFound = HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail="Токен истек, братиш")
+TokenNotFound = HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail="Пользователь не авторизован")
 
 
 NoJwtException = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,

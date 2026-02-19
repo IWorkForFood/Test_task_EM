@@ -1,24 +1,43 @@
-from datetime import datetime, date
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
-import re
-from pydantic import BaseModel, Field, EmailStr, validator, ConfigDict
-from .dependencies import WorkType
+from datetime import datetime
 
 class SOrder(BaseModel):
-    id: int = Field(description="id заказа")
-    cost: str = Field(default=3, description="Стоимость товара в рублях")
-    description: str = Field(description="Описание товара")
-    product_name: str = Field(description="Имя товара")
-    username: str = Field(description="Имя пользователя, оставившего отзыв")
+    """Схема заказа (ответ)"""
+    id: int = Field(description="ID заказа")
+    name: str = Field(description="Название заказа")
+    cost: float = Field(description="Стоимость в рублях")
+    description: str = Field(description="Описание заказа")
+    buyer_id: int = Field(description="ID покупателя")
+    product_id: int = Field(description="ID товара")
     created_at: datetime = Field(description="Время создания")
     updated_at: datetime = Field(description="Время обновления")
-
-    name: Mapped[str]
-    cost: Mapped[float]
-    description: Mapped[str]
 
     model_config = ConfigDict(from_attributes=True)
 
 
+class SOrderCreate(BaseModel):
+    """Схема создания заказа"""
+    name: str = Field(min_length=1, max_length=100, description="Название заказа")
+    cost: float = Field(gt=0, description="Стоимость в рублях (> 0)")
+    description: str = Field(max_length=1000, description="Описание заказа")
+    product_id: int = Field(gt=0, description="ID товара")
 
 
+class SOrderUpdate(BaseModel):
+    """Схема обновления заказа (все поля опциональны)"""
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    cost: Optional[float] = Field(default=None, gt=0)
+    description: Optional[str] = Field(default=None, max_length=1000)
+    product_id: Optional[int] = Field(default=None, gt=0)
+
+
+class SOrderReadMinimal(BaseModel):
+    """Минимальная схема заказа для списков"""
+    id: int
+    name: str
+    cost: float
+    buyer_id: int
+    product_id: int
+
+    model_config = ConfigDict(from_attributes=True)

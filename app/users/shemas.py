@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
 import re
 from pydantic import BaseModel, Field, EmailStr, validator, ConfigDict, field_validator, model_validator
 
@@ -12,7 +12,7 @@ class SAuthUser(BaseModel):
     @classmethod
     def check_password(cls, value: str):
         if not re.match("(?=.*[0-9])(?=.*[A-Z])[0-9a-zA-Z!@#$%^&*]{6,}", value):
-            raise ValueError("Пароль должен содержать хотя бы 1 заглавную латинскую букву, хотя бы 1 цифру")
+            raise ValueError("Пароль должен содержать хотя бы 1 заглавную латинскую букву, хотя бы 1 цифру и быть длиной не менее 8 символов")
         return value
 
     @field_validator("email")
@@ -33,6 +33,7 @@ class SRegisterUser(SAuthUser):
     first_name: str = Field(..., min_length=3, max_length=30)
     last_name: str= Field(..., min_length=3, max_length=30)
     password_replay: str = Field(..., min_length=6, max_length=30)
+    role_ids: List[int]
 
     @model_validator(mode="after")
     def check_passwords_match(self) -> "SRegisterUser":

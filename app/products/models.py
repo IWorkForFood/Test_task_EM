@@ -18,11 +18,9 @@ class Product(Base):
 
     name: Mapped[str]
     description: Mapped[str]
-    sku: Mapped[int]
     price: Mapped[float] = mapped_column(nullable=False)
     stock: Mapped[int] = mapped_column(default=0)
     seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), nullable=False)
     contact_phone: Mapped[str]
     
     category: Mapped[ProductCategory]
