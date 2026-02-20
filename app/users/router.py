@@ -3,7 +3,7 @@ from sqlalchemy import select
 from app.database import async_session_maker 
 from app.users.models import User
 from app.permissions.models import Role
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, status
 from fastapi.responses import FileResponse
 from .auth_utils import get_auth_data, get_password_hash, authenticate_user, create_access_token
 from .dependencies import get_current_user
@@ -20,7 +20,7 @@ import os
 router_user = APIRouter(prefix='/users', tags=['Работа с пользовательскими данными'])
 
 
-@router_user.post('/registration')
+@router_user.post('/registration', status_code=status.HTTP_201_CREATED)
 async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
     user = await UserDAO.find_one_or_none(email=user_data.email)
     if user:
@@ -36,7 +36,6 @@ async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
     async with async_session_maker() as session:
 
         if user_data.role_ids:
-            # Проверяем, что роли существуют
             roles = await session.execute(
                 select(Role).where(Role.id.in_(user_data.role_ids))
             )
@@ -45,9 +44,7 @@ async def add_user(user_data: SRegisterUser, background_tasks: BackgroundTasks):
             if len(existing_roles) != len(user_data.role_ids):
                 raise HTTPException(400, "Одна или несколько ролей не найдены")
 
-            # Добавляем связи
             for role_id in user_data.role_ids:
-                # Можно добавить через insert в user_roles
                 await session.execute(
                     user_roles.insert().values(user_id=current_user.id, role_id=role_id)
                 )
@@ -64,7 +61,7 @@ async def auth_user(response: Response, uset_data: SAuthUser):
                                   detail='Неверные учётные данные ')
     access_token = create_access_token({"sub": str(user.id)})
     response.set_cookie(key="users_access_token", value=access_token, httponly=True)
-    return {"ok": True, "access_token": access_token, 'refresh_token': None, 'message': 'Авторизация успешна!'}
+    return {"ok": True, "access_token": access_token, 'message': 'Авторизация успешна!'}
     
 @router_user.post('/logout')
 async def logout_user(response: Response):
