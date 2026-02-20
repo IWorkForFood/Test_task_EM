@@ -9,7 +9,7 @@ from ..users.models import User
 
 router_orders = APIRouter(
     prefix="/orders",
-    tags=["orders"]
+    tags=["Работа с заказами"]
 )
 
 @router_orders.get("", response_model=List[SOrder])
