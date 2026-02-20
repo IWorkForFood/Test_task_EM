@@ -80,10 +80,14 @@ pip install -r requirements.txt
 ```
 6)
 ```
-alembic upgrade head
+pip install bcrypt==4.2.0
 ```
 7)
 ```
+alembic upgrade head
+```
+8)
+```
 uvicorn app.main:app
 ```
-8) переходим на http://127.0.0.1:8000/docs
+9) переходим на http://127.0.0.1:8000/docs
