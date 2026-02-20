@@ -12,7 +12,7 @@ import re
 
 products_router = APIRouter(
     prefix="/products",
-    tags=["products"]
+    tags=["Работа с объявлениями"]
 )
 
 

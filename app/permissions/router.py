@@ -11,7 +11,7 @@ from app.users.models import User
 
 router = APIRouter(
     prefix="/admin/rbac",
-    tags=["admin-rbac"],
+    tags=["RBAC - управление доступом"],
 )
 
 @router.get("/get_roles", response_model = List[Role])
