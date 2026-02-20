@@ -36,18 +36,16 @@ services:
     tty: true
     stdin_open: true
 
-  web:
-    build: .
-    ports:
-      - 8004:8000
-    command: uvicorn app.main:app --host 0.0.0.0 --reload
-    volumes:
-      - .:/app
-    environment:
-      - CELERY_BROKER_URL=redis://${REDIS_USER}:${REDIS_USER_PASSWORD}@${REDIS_PASSWORD}:${REDIS_PORT}/0
-      - CELERY_RESULT_BACKEND=redis://${REDIS_USER}:${REDIS_USER_PASSWORD}@${REDIS_PASSWORD}:${REDIS_PORT}/0
-    depends_on:
-      - postgres
+#  web:
+#    build: .
+#    ports:
+#      - 8004:8000
+#    command: uvicorn app.main:app --    environment:
+#  host 0.0.0.0 --reload
+#    volumes:
+#     - .:/app
+#    depends_on:
+#      - postgres
       
 volumes:
   pgdata:

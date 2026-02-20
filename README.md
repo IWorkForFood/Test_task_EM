@@ -60,6 +60,21 @@ element_id - внешний ключ, указываающий на все ос�
 
 ### Запуск
 
-```
+1) переходим в корневую папку (Test_task_EM)
 
+2)
+```
+docker-compose up -d
+```
+3)
+```
+python -m venv venv
+```
+4)
+```
+pip install -r requirements.txt
+```
+5)
+```
+alembic upgrade head
 ```
