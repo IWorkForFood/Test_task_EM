@@ -159,7 +159,7 @@ async def delete_product(
     can_delete_own  = perms.get("delete", False)
 
     if can_delete_all:
-        pass  # может удалить любой товар
+        pass  
     elif can_delete_own:
         if product.seller_id != user.id:
             raise HTTPException(403, "Можно удалять только свои товары")

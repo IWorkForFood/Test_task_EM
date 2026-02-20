@@ -42,8 +42,7 @@ async def get_current_user(
         user_id = int(user_id_str)
     except ValueError:
         raise HTTPException(401, "Invalid user id")
-
-    # Предзагружаем роли + правила + элемент
+        
     stmt = (
         select(User)
         .options(
@@ -93,9 +92,6 @@ async def get_user_permissions_for_resource(
                 permissions["update_all"] = permissions["update_all"] or rule.update_all
                 permissions["delete"] = permissions["delete"] or rule.delete
                 permissions["delete_all"] = permissions["delete_all"] or rule.delete_all
-    
-    print(permissions)
-    logging.warning(permissions)
 
     return permissions
 

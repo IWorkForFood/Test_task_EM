@@ -15,14 +15,23 @@ router = APIRouter(
 )
 
 @router.get("/get_roles", response_model = List[Role])
-async def get_roles(admin: User = Depends(permission_required("AccessRule", ["read", "read_all"]))):
+async def get_roles():
     result = await RoleDAO.find_all()
     return result
 
 @router.get("/get_business_element", response_model = List[BusinessElement])
-async def get_roles(admin: User = Depends(permission_required("AccessRule", ["read", "read_all"]))):
+async def get_roles():
     result = await BusinessElementDAO.find_all()
     return result
+#admin: User = Depends(permission_required("AccessRule", ["read", "read_all"]))
+@router.get(
+    "/rules",
+    summary="Получить правила доступа (только для админа)"
+    )
+async def get_roles():
+    result = await AccessRuleDAO.find_all()
+    return result
+
 
 @router.patch(
     "/rules",
