@@ -76,7 +76,7 @@ python -m venv venv
 ```
 5)
 ```
-pip install -r requirements.txt
+pip install -r reqs.txt
 ```
 6)
 ```
